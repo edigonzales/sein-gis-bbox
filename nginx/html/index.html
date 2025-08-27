@@ -1,0 +1,82 @@
+<!doctype html>
+<aside id="sidebar">
+<h3>Live-Status</h3>
+<div class="kv"><b>iFrame URL</b> <span id="frameUrl">(—)</span></div>
+<div class="kv"><b>c</b> <span id="center">(—)</span></div>
+<div class="kv"><b>s</b> <span id="zoom">(—)</span></div>
+<p>Die Parent-URL wird per <code>history.replaceState</code> mit <code>c</code>/<code>s</code> synchronisiert.</p>
+</aside>
+<main>
+<!--
+IMPORTANT:
+The upstream QWC2 is proxied to the same origin at /map/ so DOM access works.
+If you still get cross-origin errors, the upstream is likely blocking framing via headers.
+-->
+<iframe id="map" src="/map/" allow="fullscreen" referrerpolicy="strict-origin-when-cross-origin" width="1000" height="600"></iframe>
+</main>
+</div>
+
+
+<script>
+const frame = document.getElementById('map');
+const frameUrlEl = document.getElementById('frameUrl');
+const centerEl = document.getElementById('center');
+const zoomEl = document.getElementById('zoom');
+
+
+let lastHref = '';
+
+
+function parseCenterAndZoom(href) {
+try {
+const u = new URL(href);
+let center = u.searchParams.get('c');
+let zoom = u.searchParams.get('s');
+
+
+// Some apps encode params in the hash
+if ((!center || !zoom) && u.hash) {
+const c = u.hash.match(/(^|[&#])c=([^&]+)/);
+const z = u.hash.match(/(^|[&#])s=([^&]+)/);
+if (c) center = decodeURIComponent(c[2]);
+if (z) zoom = decodeURIComponent(z[2]);
+}
+
+
+return { center, zoom };
+} catch (e) {
+return { center: null, zoom: null };
+}
+}
+
+
+function syncParentUrl(center, zoom) {
+const url = new URL(location.href);
+if (center) url.searchParams.set('center', center);
+if (zoom) url.searchParams.set('zoom', zoom);
+history.replaceState({ center, zoom }, '', url);
+}
+
+
+// Poll the iframe location (robust across SPA pushState/replaceState in the iframe)
+const timer = setInterval(() => {
+try {
+const href = frame.contentWindow.location.href; // same-origin access expected
+if (href && href !== lastHref) {
+lastHref = href;
+frameUrlEl.textContent = href;
+const { center, zoom } = parseCenterAndZoom(href);
+centerEl.textContent = center || '(n/a)';
+zoomEl.textContent = zoom || '(n/a)';
+if (center || zoom) syncParentUrl(center, zoom);
+}
+} catch (e) {
+// If you see errors here, the iframe is still cross-origin or blocked by frame headers.
+}
+}, 300);
+
+
+window.addEventListener('beforeunload', () => clearInterval(timer));
+</script>
+</body>
+</html>
