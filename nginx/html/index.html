@@ -78,5 +78,39 @@ if (center || zoom) syncParentUrl(center, zoom);
 
 window.addEventListener('beforeunload', () => clearInterval(timer));
 </script>
+
+<!-- Um die Requests abzufangen, falls man mehr Infos von den Aktionen im Web GIS Client will...-->
+<script>
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    .then(() => navigator.serviceWorker.ready)
+    .then(() => {
+      console.log('SW ready');
+
+      // Ensure iframe is controlled by the SW. With clients.claim() it *should* be,
+      // but if not, force a one-time reload of the iframe.
+    //   if (!navigator.serviceWorker.controller) {
+    //     // Page not yet controlled; reload whole page to be safe:
+    //     location.reload();
+    //   }
+    })
+    .catch(console.error);
+
+  // Receive messages from the SW
+  navigator.serviceWorker.addEventListener('message', (ev) => {
+    console.log('SW → page:', ev.data);
+    const { url, contentType, text } = ev.data || {};
+    if (!url || !text) return;
+    // Example: parse XML
+    if ((contentType || '').includes('xml') || /^\s*<\??xml|^\s*<\w+/.test(text)) {
+      const doc = new DOMParser().parseFromString(text, 'text/xml'); // was application/xml
+      console.log('Parsed XML from', url, doc);
+      // TODO: do your thing with `doc`
+    }
+  });
+}
+</script>
+
 </body>
 </html>
